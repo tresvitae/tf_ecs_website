@@ -1,12 +1,9 @@
-variable "open_ip" {
-  type = list(string)
-}
-
 provider "aws" {
   profile = "default"
-  region = "eu-west-1"
+  region  = "eu-west-1"
 }
 
+# VPC SUBNETS
 resource "aws_default_vpc" "default" {}
 
 resource "aws_default_subnet" "default_az1" {
@@ -23,32 +20,125 @@ resource "aws_default_subnet" "default_az2" {
   }
 }
 
-resource "aws_security_group" "prod_web" {
-  name            = "prod_web"
-  description     = "Allow standard htttp and https prots inbound and everything outbound"
+
+# CLUSTER & TASK DEFINITION
+resource "aws_ecs_cluster" "ecs_cluster" {
+  name = "my-cluster"
+
+  tags = {
+    "Terraform" : "true"
+  }
+}
+
+resource "aws_ecr_repository" "web_app" {
+    name  = "web_app"
+}
+
+resource "aws_ecs_task_definition" "task_definition" {
+  family                = "web_app"
+  container_definitions = file("task_definitions.json")
+}
+
+
+# Set IAM role
+data "aws_iam_policy_document" "ecs_agent" {
+  statement {
+    actions       = ["sts:AssumeRole"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["ec2.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role" "ecs_agent" {
+  name               = "ecs-agent"
+  assume_role_policy = data.aws_iam_policy_document.ecs_agent.json
+}
+
+resource "aws_iam_role_policy_attachment" "ecs_agent" {
+  role                = aws_iam_role.ecs_agent.name
+  policy_arn          = "arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role"
+}
+
+resource "aws_iam_instance_profile" "ecs_agent" {
+  name                = "ecs-agent"
+  role                = aws_iam_role.ecs_agent.name
+}
+
+
+# Set EC2 with autoscaling group
+resource "aws_launch_configuration" "ecs_launch_config" {
+  image_id             = var.ecs_ami
+  iam_instance_profile = aws_iam_instance_profile.ecs_agent.name
+  security_groups      = [aws_security_group.ecs_sg.id]
+  user_data            = "#!/bin/bash\n echo ECS_CLUSTER=my-cluster >> /etc/ecs/ecs.config"
+# my-cluster (in user_data) as name of cluster /hard code only
+  instance_type        = var.instance_type
+}
+
+resource "aws_autoscaling_group" "failure_analysis_ecs_asg" {
+  name                      = "asg"
+  vpc_zone_identifier       = var.availability_zones
+  launch_configuration      = aws_launch_configuration.ecs_launch_config.name
+
+  desired_capacity          = var.desired_capacity
+  min_size                  = var.min_size
+  max_size                  = var.max_size
+  health_check_grace_period = 300
+  health_check_type         = "EC2"
+}
+
+resource "aws_security_group" "ecs_sg" {
+  name              = "${var.project_name}--${var.environment}--alb"
+  vpc_id            = aws_default_vpc.default.id
 
   ingress {
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = var.open_ip
+    from_port       = 80
+    to_port         = 80
+    protocol        = "tcp"
+    cidr_blocks     = var.open_ip
   }
-
   ingress {
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = var.open_ip
+    from_port       = 443
+    to_port         = 443
+    protocol        = "tcp"
+    cidr_blocks     = var.open_ip
   }
-
   egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = var.open_ip
+    from_port       = 0
+    to_port         = 0
+    protocol        = "-1"
+    cidr_blocks     = var.open_ip
   }
 
   tags = {
     "Terraform" : "true"
   }
 }
+
+
+# SERVICE
+resource "aws_ecs_service" "web_app" {
+  name            = "${var.project_name}--${var.environment}--service"
+  cluster         = aws_ecs_cluster.ecs_cluster.id
+  task_definition = aws_ecs_task_definition.task_definition.arn
+  desired_count   = 2
+}
+
+/*
+TODO:
+module "cluster" {
+  source             = "./modules/cluster"
+}
+
+module "service" {
+  source = "./modules/service"
+}
+
+module "elb" {
+  source = "./modules/elb"
+}
+
+*/
