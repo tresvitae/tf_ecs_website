@@ -34,9 +34,9 @@ resource "aws_ecr_repository" "web_app" {
     name  = "web_app"
 }
 
-resource "aws_ecs_task_definition" "task_definition" {
+resource "aws_ecs_task_definition" "softserve" {
   family                = "web_app"
-  container_definitions = file("task_definitions.json")
+  container_definitions = file("softserve.json")
 }
 
 
@@ -80,7 +80,7 @@ resource "aws_launch_configuration" "ecs_launch_config" {
 
 resource "aws_autoscaling_group" "failure_analysis_ecs_asg" {
   name                      = "asg"
-  vpc_zone_identifier       = var.availability_zones
+  vpc_zone_identifier       = [aws_default_subnet.default_az1.id,aws_default_subnet.default_az2.id]
   launch_configuration      = aws_launch_configuration.ecs_launch_config.name
 
   desired_capacity          = var.desired_capacity
@@ -123,7 +123,7 @@ resource "aws_security_group" "ecs_sg" {
 resource "aws_ecs_service" "web_app" {
   name            = "${var.project_name}--${var.environment}--service"
   cluster         = aws_ecs_cluster.ecs_cluster.id
-  task_definition = aws_ecs_task_definition.task_definition.arn
+  task_definition = aws_ecs_task_definition.softserve.arn
   desired_count   = 2
 }
 
