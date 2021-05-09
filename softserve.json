@@ -1,15 +1,18 @@
 [
   {
     "name": "softserve",
+    "executionRoleArn": "arn:aws:iam::309607161053:role/ecsTaskExecutionRole",
+    "taskRoleArn": "arn:aws:iam::309607161053:role/ecsTaskExecutionRole",
     "essential": true,
     "portMappings": [
       {
         "containerPort": 80,
-        "hostPort": 80
+        "hostPort": 0,
+        "protocol": "tcp"
       }
     ],
-    "memory": 512,
-    "cpu": 2,
+    "memory": 50,
+    "cpu": 128,
     "image": "309607161053.dkr.ecr.eu-west-1.amazonaws.com/softserve-repo:latest",
     "environment": []
   }
