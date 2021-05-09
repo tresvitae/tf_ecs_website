@@ -72,7 +72,7 @@ resource "aws_iam_instance_profile" "ecs_agent" {
 resource "aws_launch_configuration" "ecs_launch_config" {
   image_id             = var.ecs_ami
   iam_instance_profile = aws_iam_instance_profile.ecs_agent.name
-  security_groups      = [aws_security_group.ecs_sg.id]
+  security_groups      = [aws_security_group.cluster_sg.id]
   user_data            = "#!/bin/bash\n echo ECS_CLUSTER=my-cluster >> /etc/ecs/ecs.config"
 # my-cluster (in user_data) as name of cluster /hard code only
   instance_type        = var.instance_type
@@ -90,8 +90,8 @@ resource "aws_autoscaling_group" "failure_analysis_ecs_asg" {
   health_check_type         = "EC2"
 }
 
-resource "aws_security_group" "ecs_sg" {
-  name              = "${var.project_name}--${var.environment}--sg_ecs"
+resource "aws_security_group" "alb_sg" {
+  name              = "${var.project_name}--${var.environment}--alb_sg"
   vpc_id            = aws_default_vpc.default.id
 
   ingress {
@@ -122,7 +122,7 @@ resource "aws_security_group" "ecs_sg" {
 # LOAD BALANCER
 resource "aws_alb" "ecs-load-balancer" {
     name                = "ecs-alb"
-    security_groups     = [aws_security_group.ecs_sg.id]
+    security_groups     = [aws_security_group.alb_sg.id]
     subnets             = [aws_default_subnet.default_az1.id,aws_default_subnet.default_az2.id]
 
   tags = {
@@ -163,8 +163,8 @@ resource "aws_alb_listener" "alb-listener" {
     }
 }
 
-resource "aws_security_group" "alb_sg" {
-  name              = "${var.project_name}--${var.environment}--sg_alb"
+resource "aws_security_group" "cluster_sg" {
+  name              = "${var.project_name}--${var.environment}--cluster_sg"
   vpc_id            = aws_default_vpc.default.id
 
   egress {
@@ -179,13 +179,13 @@ resource "aws_security_group" "alb_sg" {
   }
 }
 
-resource "aws_security_group_rule" "instance_in_alb" {
+resource "aws_security_group_rule" "internal_traffic" {
   type                     = "ingress"
   from_port                = 32768
   to_port                  = 65535
   protocol                 = "tcp"
-  source_security_group_id = aws_security_group.ecs_sg.id
-  security_group_id        = aws_security_group.alb_sg.id
+  source_security_group_id = aws_security_group.alb_sg.id
+  security_group_id        = aws_security_group.cluster_sg.id
 }
 
 
