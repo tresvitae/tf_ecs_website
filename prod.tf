@@ -199,37 +199,25 @@ resource "aws_security_group" "alb_sg" {
 }
 
 
-# SERVICE
-resource "aws_ecs_service" "web_app" {
-  name            = "${var.project_name}--${var.environment}--service"
-  cluster         = aws_ecs_cluster.ecs_cluster.id
-  task_definition = aws_ecs_task_definition.softserve.arn
-  desired_count   = 2
-  #iam_role        = aws_iam_role.ecs_agent.arn
-  deployment_maximum_percent         = 200
-  deployment_minimum_healthy_percent = 100
-  
-  ordered_placement_strategy {
-    type  = "spread"
-    field = "instanceId"
-  }
+module "service" {
+  source = "./modules/service"
 
-  load_balancer {
-    target_group_arn = "${aws_alb_target_group.app.arn}"
-    container_name   = "softserve"
-    container_port   = 80
-  }
+  project_name = var.project_name
+  environment = var.environment
+  
+  cluster_id = aws_ecs_cluster.ecs_cluster.id
+  target_group = "${aws_alb_target_group.app.arn}"
+  task_arn = aws_ecs_task_definition.softserve.arn
 }
+
 
 /*
   
 TODO:
 module "cluster" {
   source             = "./modules/cluster"
-}
 
-module "service" {
-  source = "./modules/service"
+  3res?
 }
 
 module "elb" {
