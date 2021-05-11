@@ -121,92 +121,29 @@ resource "aws_security_group_rule" "internal_traffic" {
   from_port                = 32768
   to_port                  = 65535
   protocol                 = "tcp"
-  source_security_group_id = aws_security_group.alb_sg.id
+  source_security_group_id = module.alb.sg_id # aws_security_group.alb_sg.id
   security_group_id        = aws_security_group.cluster_sg.id
 }
 
+module "alb" {
+  source = "./modules/alb"
 
-# LOAD BALANCER
-resource "aws_alb" "app" {
-    name                = "web-app--alb"
-    security_groups     = [aws_security_group.alb_sg.id]
-    subnets             = [aws_default_subnet.default_az1.id,aws_default_subnet.default_az2.id]
+  project_name = var.project_name
+  environment = var.environment
+  open_ip = var.open_ip
 
-  tags = {
-    "Terraform" : "true"
-  }
+  vpc = aws_default_vpc.default.id
+  subnets_id = [aws_default_subnet.default_az1.id,aws_default_subnet.default_az2.id]
 }
-
-resource "aws_alb_target_group" "app" {
-  name                = "web-app--tf"
-  port                = "80"
-  protocol            = "HTTP"
-  vpc_id              = aws_default_vpc.default.id
-
-  health_check {
-    healthy_threshold   = "5"
-    unhealthy_threshold = "2"
-    interval            = "30"
-    matcher             = "200"
-    path                = "/"
-    port                = "traffic-port"
-    protocol            = "HTTP"
-    timeout             = "5"
-  }
-
-  tags = {
-    "Terraform" : "true"
-  }
-}
-
-resource "aws_alb_listener" "listener" {
-  load_balancer_arn = "${aws_alb.app.arn}"
-  port              = "80"
-  protocol          = "HTTP"
-
-  default_action {
-    target_group_arn = "${aws_alb_target_group.app.arn}"
-    type             = "forward"
-  }
-}
-
-resource "aws_security_group" "alb_sg" {
-  name              = "${var.project_name}--${var.environment}--alb-sg"
-  vpc_id            = aws_default_vpc.default.id
-
-  ingress {
-    from_port       = 80
-    to_port         = 80
-    protocol        = "tcp"
-    cidr_blocks     = var.open_ip
-  }
-  ingress {
-    from_port       = 443
-    to_port         = 443
-    protocol        = "tcp"
-    cidr_blocks     = var.open_ip
-  }
-  egress {
-    from_port       = 0
-    to_port         = 0
-    protocol        = "-1"
-    cidr_blocks     = var.open_ip
-  }
-
-  tags = {
-    "Terraform" : "true"
-  }
-}
-
 
 module "service" {
   source = "./modules/service"
 
   project_name = var.project_name
   environment = var.environment
-  
+
   cluster_id = aws_ecs_cluster.ecs_cluster.id
-  target_group = "${aws_alb_target_group.app.arn}"
+  target_group = module.alb.tg_arn # "${aws_alb_target_group.app.arn}"
   task_arn = aws_ecs_task_definition.softserve.arn
 }
 
@@ -218,10 +155,6 @@ module "cluster" {
   source             = "./modules/cluster"
 
   3res?
-}
-
-module "elb" {
-  source = "./modules/elb"
 }
 
 */
