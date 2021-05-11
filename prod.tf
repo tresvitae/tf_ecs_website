@@ -3,7 +3,7 @@ provider "aws" {
   region  = "eu-west-1"
 }
 
-# VPC SUBNETS
+# DEFAULT VPC & SUBNETS
 resource "aws_default_vpc" "default" {}
 
 resource "aws_default_subnet" "default_az1" {
@@ -30,16 +30,16 @@ resource "aws_ecs_cluster" "ecs_cluster" {
 }
 
 resource "aws_ecr_repository" "web_app" {
-    name  = "web_app"
+    name  = "web-app"
 }
 
 resource "aws_ecs_task_definition" "softserve" {
-  family                = "web_app"
+  family                = "web-app"
   container_definitions = file("softserve.json")
 }
 
 
-# Set IAM role
+# IAM ROLE
 data "aws_iam_policy_document" "ecs_agent" {
   statement {
     actions       = ["sts:AssumeRole"]
@@ -68,24 +68,24 @@ resource "aws_iam_instance_profile" "ecs_agent" {
 }
 
 
-# Set EC2 with autoscaling group as cluster
-resource "aws_launch_configuration" "ecs_launch_config" {
+# EC2 CLUSTER = AUTOSCALING & LAUNCH CONFIGURATION
+resource "aws_launch_configuration" "launch_config" {
   image_id             = var.ecs_ami
   iam_instance_profile = aws_iam_instance_profile.ecs_agent.name
   security_groups      = [aws_security_group.cluster_sg.id]
+  instance_type        = var.instance_type
   user_data            = <<EOF
 #! /bin/bash
 sudo apt-get update
 sudo echo "ECS_CLUSTER=${aws_ecs_cluster.ecs_cluster.name}" >> /etc/ecs/ecs.config
 EOF
 # my-cluster (in user_data) as name of cluster /hard code only
-  instance_type        = var.instance_type
 }
 
-resource "aws_autoscaling_group" "failure_analysis_ecs_asg" {
+resource "aws_autoscaling_group" "asg" {
   name                      = "asg"
   vpc_zone_identifier       = [aws_default_subnet.default_az1.id,aws_default_subnet.default_az2.id]
-  launch_configuration      = aws_launch_configuration.ecs_launch_config.name
+  launch_configuration      = aws_launch_configuration.launch_config.name
 
   desired_capacity          = var.desired_capacity
   min_size                  = var.min_size
@@ -95,7 +95,7 @@ resource "aws_autoscaling_group" "failure_analysis_ecs_asg" {
 
   tag {
     key                 = "Name"
-    value               = "ecs-ec2"
+    value               = "${var.project_name}--${var.environment}--ecs"
     propagate_at_launch = true
   }
 }
@@ -127,8 +127,8 @@ resource "aws_security_group_rule" "internal_traffic" {
 
 
 # LOAD BALANCER
-resource "aws_alb" "ecs-load-balancer" {
-    name                = "ecs-alb"
+resource "aws_alb" "app" {
+    name                = "web-app--alb"
     security_groups     = [aws_security_group.alb_sg.id]
     subnets             = [aws_default_subnet.default_az1.id,aws_default_subnet.default_az2.id]
 
@@ -137,8 +137,8 @@ resource "aws_alb" "ecs-load-balancer" {
   }
 }
 
-resource "aws_alb_target_group" "ecs-target-group" {
-  name                = "ecs-target-group"
+resource "aws_alb_target_group" "app" {
+  name                = "web-app--tf"
   port                = "80"
   protocol            = "HTTP"
   vpc_id              = aws_default_vpc.default.id
@@ -159,19 +159,19 @@ resource "aws_alb_target_group" "ecs-target-group" {
   }
 }
 
-resource "aws_alb_listener" "alb-listener" {
-  load_balancer_arn = "${aws_alb.ecs-load-balancer.arn}"
+resource "aws_alb_listener" "listener" {
+  load_balancer_arn = "${aws_alb.app.arn}"
   port              = "80"
   protocol          = "HTTP"
 
   default_action {
-    target_group_arn = "${aws_alb_target_group.ecs-target-group.arn}"
+    target_group_arn = "${aws_alb_target_group.app.arn}"
     type             = "forward"
   }
 }
 
 resource "aws_security_group" "alb_sg" {
-  name              = "${var.project_name}--${var.environment}--alb_sg"
+  name              = "${var.project_name}--${var.environment}--alb-sg"
   vpc_id            = aws_default_vpc.default.id
 
   ingress {
@@ -215,7 +215,7 @@ resource "aws_ecs_service" "web_app" {
   }
 
   load_balancer {
-    target_group_arn = "${aws_alb_target_group.ecs-target-group.arn}"
+    target_group_arn = "${aws_alb_target_group.app.arn}"
     container_name   = "softserve"
     container_port   = 80
   }

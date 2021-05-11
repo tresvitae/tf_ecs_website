@@ -1,18 +1,11 @@
 open_ip = ["0.0.0.0/0"]
-project_name = "web_app"
-environment = "test"
-# The AMI to seed ECS instances with.
-# Leave empty to use the latest Linux 2 ECS-optimized AMI by Amazon.
-#aws_ecs_ami = ""
+project_name = "web"
+environment = "test" # test / env / dev
 availability_zones = ["eu-west-1a", "eu-west-1b"]
-
-# Maximum, minimum and desired number of instances in the ECS cluster.
 max_size = 3
 min_size = 1
 desired_capacity = 2
-instance_type = "t2.micro"
+instance_type = "t3.micro"
 ecs_ami = "ami-0b11be160d53889ae"
 iam_policy_arn = ["arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role",
-"arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy",
-"arn:aws:iam::309607161053:policy/myECS-service-role-policy"]
-# "arn:aws:iam::aws:policy/aws-service-role/AmazonECSServiceRolePolicy"]
+"arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"]
