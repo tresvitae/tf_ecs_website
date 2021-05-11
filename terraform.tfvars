@@ -12,3 +12,7 @@ min_size = 1
 desired_capacity = 2
 instance_type = "t2.micro"
 ecs_ami = "ami-0b11be160d53889ae"
+iam_policy_arn = ["arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role",
+"arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy",
+"arn:aws:iam::309607161053:policy/myECS-service-role-policy"]
+# "arn:aws:iam::aws:policy/aws-service-role/AmazonECSServiceRolePolicy"]

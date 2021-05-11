@@ -20,7 +20,6 @@ resource "aws_default_subnet" "default_az2" {
   }
 }
 
-
 # CLUSTER & TASK DEFINITION
 resource "aws_ecs_cluster" "ecs_cluster" {
   name = "my-cluster"
@@ -58,8 +57,9 @@ resource "aws_iam_role" "ecs_agent" {
 }
 
 resource "aws_iam_role_policy_attachment" "ecs_agent" {
-  role                = aws_iam_role.ecs_agent.name
-  policy_arn          = "arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role"
+  role       = aws_iam_role.ecs_agent.name
+  count      = "${length(var.iam_policy_arn)}"
+  policy_arn = "${var.iam_policy_arn[count.index]}"
 }
 
 resource "aws_iam_instance_profile" "ecs_agent" {
@@ -68,12 +68,16 @@ resource "aws_iam_instance_profile" "ecs_agent" {
 }
 
 
-# Set EC2 with autoscaling group
+# Set EC2 with autoscaling group as cluster
 resource "aws_launch_configuration" "ecs_launch_config" {
   image_id             = var.ecs_ami
   iam_instance_profile = aws_iam_instance_profile.ecs_agent.name
   security_groups      = [aws_security_group.cluster_sg.id]
-  user_data            = "#!/bin/bash\n echo ECS_CLUSTER=my-cluster >> /etc/ecs/ecs.config"
+  user_data            = <<EOF
+#! /bin/bash
+sudo apt-get update
+sudo echo "ECS_CLUSTER=${aws_ecs_cluster.ecs_cluster.name}" >> /etc/ecs/ecs.config
+EOF
 # my-cluster (in user_data) as name of cluster /hard code only
   instance_type        = var.instance_type
 }
@@ -88,24 +92,18 @@ resource "aws_autoscaling_group" "failure_analysis_ecs_asg" {
   max_size                  = var.max_size
   health_check_grace_period = 300
   health_check_type         = "EC2"
+
+  tag {
+    key                 = "Name"
+    value               = "ecs-ec2"
+    propagate_at_launch = true
+  }
 }
 
-resource "aws_security_group" "alb_sg" {
-  name              = "${var.project_name}--${var.environment}--alb_sg"
+resource "aws_security_group" "cluster_sg" {
+  name              = "${var.project_name}--${var.environment}--cluster_sg"
   vpc_id            = aws_default_vpc.default.id
 
-  ingress {
-    from_port       = 80
-    to_port         = 80
-    protocol        = "tcp"
-    cidr_blocks     = var.open_ip
-  }
-  ingress {
-    from_port       = 443
-    to_port         = 443
-    protocol        = "tcp"
-    cidr_blocks     = var.open_ip
-  }
   egress {
     from_port       = 0
     to_port         = 0
@@ -116,6 +114,15 @@ resource "aws_security_group" "alb_sg" {
   tags = {
     "Terraform" : "true"
   }
+}
+
+resource "aws_security_group_rule" "internal_traffic" {
+  type                     = "ingress"
+  from_port                = 32768
+  to_port                  = 65535
+  protocol                 = "tcp"
+  source_security_group_id = aws_security_group.alb_sg.id
+  security_group_id        = aws_security_group.cluster_sg.id
 }
 
 
@@ -153,20 +160,32 @@ resource "aws_alb_target_group" "ecs-target-group" {
 }
 
 resource "aws_alb_listener" "alb-listener" {
-    load_balancer_arn = "${aws_alb.ecs-load-balancer.arn}"
-    port              = "80"
-    protocol          = "HTTP"
+  load_balancer_arn = "${aws_alb.ecs-load-balancer.arn}"
+  port              = "80"
+  protocol          = "HTTP"
 
-    default_action {
-        target_group_arn = "${aws_alb_target_group.ecs-target-group.arn}"
-        type             = "forward"
-    }
+  default_action {
+    target_group_arn = "${aws_alb_target_group.ecs-target-group.arn}"
+    type             = "forward"
+  }
 }
 
-resource "aws_security_group" "cluster_sg" {
-  name              = "${var.project_name}--${var.environment}--cluster_sg"
+resource "aws_security_group" "alb_sg" {
+  name              = "${var.project_name}--${var.environment}--alb_sg"
   vpc_id            = aws_default_vpc.default.id
 
+  ingress {
+    from_port       = 80
+    to_port         = 80
+    protocol        = "tcp"
+    cidr_blocks     = var.open_ip
+  }
+  ingress {
+    from_port       = 443
+    to_port         = 443
+    protocol        = "tcp"
+    cidr_blocks     = var.open_ip
+  }
   egress {
     from_port       = 0
     to_port         = 0
@@ -179,15 +198,6 @@ resource "aws_security_group" "cluster_sg" {
   }
 }
 
-resource "aws_security_group_rule" "internal_traffic" {
-  type                     = "ingress"
-  from_port                = 32768
-  to_port                  = 65535
-  protocol                 = "tcp"
-  source_security_group_id = aws_security_group.alb_sg.id
-  security_group_id        = aws_security_group.cluster_sg.id
-}
-
 
 # SERVICE
 resource "aws_ecs_service" "web_app" {
@@ -195,10 +205,24 @@ resource "aws_ecs_service" "web_app" {
   cluster         = aws_ecs_cluster.ecs_cluster.id
   task_definition = aws_ecs_task_definition.softserve.arn
   desired_count   = 2
-  # LOAD BALANCER??????? load_balancer {}
+  #iam_role        = aws_iam_role.ecs_agent.arn
+  deployment_maximum_percent         = 200
+  deployment_minimum_healthy_percent = 100
+  
+  ordered_placement_strategy {
+    type  = "spread"
+    field = "instanceId"
+  }
+
+  load_balancer {
+    target_group_arn = "${aws_alb_target_group.ecs-target-group.arn}"
+    container_name   = "softserve"
+    container_port   = 80
+  }
 }
 
 /*
+  
 TODO:
 module "cluster" {
   source             = "./modules/cluster"
