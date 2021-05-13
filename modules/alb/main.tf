@@ -1,5 +1,5 @@
 resource "aws_alb" "app" {
-  name                = "web-app--alb"
+  name                = "${var.project_name}-${(terraform.workspace == "prod" ? "prod" : "test")}--alb"
   security_groups     = [aws_security_group.alb_sg.id]
   subnets             = var.subnets_id # [aws_default_subnet.default_az1.id,aws_default_subnet.default_az2.id]
 
@@ -9,7 +9,7 @@ resource "aws_alb" "app" {
 }
 
 resource "aws_alb_target_group" "app" {
-  name                = "web-app--tf"
+  name                = "${var.project_name}-${(terraform.workspace == "prod" ? "prod" : "test")}--tf"
   port                = "80"
   protocol            = "HTTP"
   vpc_id              = var.vpc # aws_default_vpc.default.id
@@ -42,7 +42,7 @@ resource "aws_alb_listener" "listener" {
 }
 
 resource "aws_security_group" "alb_sg" {
-  name              = "${var.project_name}--${var.environment}--alb-sg"
+  name              = "${var.project_name}-${(terraform.workspace == "prod" ? "prod" : "test")}--alb-sg"
   vpc_id            = var.vpc # aws_default_vpc.default.id
 
   ingress {

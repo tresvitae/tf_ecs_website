@@ -3,3 +3,4 @@
 terraform.tfstate
 terraform.tfstate.backup
 destroy.plan
+terraform.tfstate.d

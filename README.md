@@ -8,13 +8,17 @@
 - deploy service in cluster with Task Definition
 - set Task Definition: docker image of website
 - build container in softserve.json
-- attach standard IAM Policy to cluster {var.iam_policy_arn}
+- attach standard IAM Policy to cluster {var.iam_policy_arn}  
+
+
+## Select workspace:
+`terraform workspace ` prod / dev / test  
 
 ## Setup:
-`terraform apply`
+`terraform apply`  
 
 ## Clean up:
 ```sh
 terraform plan -destroy -out destroy.plan
 terraform apply destroy.plan
-```
+```  

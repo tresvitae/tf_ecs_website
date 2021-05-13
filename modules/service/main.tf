@@ -1,5 +1,5 @@
 resource "aws_ecs_service" "web_app" {
-  name            = "${var.project_name}--${var.environment}--service"
+  name            = "${var.project_name}-${(terraform.workspace == "prod" ? "prod" : "test")}--service"
   cluster         = var.cluster_id # aws_ecs_cluster.ecs_cluster.id
   task_definition = var.task_arn # aws_ecs_task_definition.softserve.arn
   desired_count   = 2

@@ -22,7 +22,7 @@ resource "aws_default_subnet" "default_az2" {
 
 # CLUSTER & TASK DEFINITION
 resource "aws_ecs_cluster" "ecs_cluster" {
-  name = "my-cluster"
+  name = "${var.project_name}-${(terraform.workspace == "prod" ? "prod" : "test")}--my-cluster"
 
   tags = {
     "Terraform" : "true"
@@ -30,7 +30,7 @@ resource "aws_ecs_cluster" "ecs_cluster" {
 }
 
 resource "aws_ecr_repository" "web_app" {
-    name  = "web-app"
+    name  = (terraform.workspace == "prod" ? "web-app" : "web-test")
 }
 
 resource "aws_ecs_task_definition" "softserve" {
@@ -52,7 +52,7 @@ data "aws_iam_policy_document" "ecs_agent" {
 }
 
 resource "aws_iam_role" "ecs_agent" {
-  name               = "ecs-agent"
+  name               = (terraform.workspace == "prod" ? "ecs-agent" : "ecs-agent-test")
   assume_role_policy = data.aws_iam_policy_document.ecs_agent.json
 }
 
@@ -63,7 +63,7 @@ resource "aws_iam_role_policy_attachment" "ecs_agent" {
 }
 
 resource "aws_iam_instance_profile" "ecs_agent" {
-  name                = "ecs-agent"
+  name                = (terraform.workspace == "prod" ? "ecs-agent" : "ecs-agent-test")
   role                = aws_iam_role.ecs_agent.name
 }
 
@@ -73,7 +73,7 @@ resource "aws_launch_configuration" "launch_config" {
   image_id             = var.ecs_ami
   iam_instance_profile = aws_iam_instance_profile.ecs_agent.name
   security_groups      = [aws_security_group.cluster_sg.id]
-  instance_type        = var.instance_type
+  instance_type        = (terraform.workspace == "prod" ? var.instance_prod : var.instance_test)
   user_data            = <<EOF
 #! /bin/bash
 sudo apt-get update
@@ -83,7 +83,7 @@ EOF
 }
 
 resource "aws_autoscaling_group" "asg" {
-  name                      = "asg"
+  name                      = "${var.project_name}-${(terraform.workspace == "prod" ? "prod" : "test")}-asg"
   vpc_zone_identifier       = [aws_default_subnet.default_az1.id,aws_default_subnet.default_az2.id]
   launch_configuration      = aws_launch_configuration.launch_config.name
 
@@ -95,13 +95,13 @@ resource "aws_autoscaling_group" "asg" {
 
   tag {
     key                 = "Name"
-    value               = "${var.project_name}--${var.environment}--ecs"
+    value               = "${var.project_name}-${(terraform.workspace == "prod" ? "prod" : "test")}--ecs"
     propagate_at_launch = true
   }
 }
 
 resource "aws_security_group" "cluster_sg" {
-  name              = "${var.project_name}--${var.environment}--cluster_sg"
+  name              = "${var.project_name}-${(terraform.workspace == "prod" ? "prod" : "test")}--cluster-sg"
   vpc_id            = aws_default_vpc.default.id
 
   egress {
@@ -129,7 +129,6 @@ module "alb" {
   source = "./modules/alb"
 
   project_name = var.project_name
-  environment = var.environment
   open_ip = var.open_ip
 
   vpc = aws_default_vpc.default.id
@@ -140,21 +139,8 @@ module "service" {
   source = "./modules/service"
 
   project_name = var.project_name
-  environment = var.environment
 
   cluster_id = aws_ecs_cluster.ecs_cluster.id
   target_group = module.alb.tg_arn # "${aws_alb_target_group.app.arn}"
   task_arn = aws_ecs_task_definition.softserve.arn
 }
-
-
-/*
-  
-TODO:
-module "cluster" {
-  source             = "./modules/cluster"
-
-  3res?
-}
-
-*/

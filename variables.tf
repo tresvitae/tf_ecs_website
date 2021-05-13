@@ -5,11 +5,10 @@ variable "availability_zones" {
   description = "The AWS availability zones to create subnets in."
   type = list
 }
-variable "environment" {
-  description = " prod / dev / test"
+variable "instance_prod" {
   type = string
 }
-variable "instance_type" {
+variable "instance_test" {
   type = string
 }
 variable "ecs_ami" {
