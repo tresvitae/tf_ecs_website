@@ -129,10 +129,10 @@ module "alb" {
   source = "./modules/alb"
 
   project_name = var.project_name
-  open_ip = var.open_ip
+  open_ip      = var.open_ip
 
-  vpc = aws_default_vpc.default.id
-  subnets_id = [aws_default_subnet.default_az1.id,aws_default_subnet.default_az2.id]
+  vpc          = aws_default_vpc.default.id
+  subnets_id   = [aws_default_subnet.default_az1.id,aws_default_subnet.default_az2.id]
 }
 
 module "service" {
@@ -140,16 +140,16 @@ module "service" {
 
   project_name = var.project_name
 
-  cluster_id = aws_ecs_cluster.ecs_cluster.id
+  cluster_id   = aws_ecs_cluster.ecs_cluster.id
   target_group = module.alb.tg_arn # "${aws_alb_target_group.app.arn}"
-  task_arn = aws_ecs_task_definition.softserve.arn
+  task_arn     = aws_ecs_task_definition.softserve.arn
 }
 
 
 module "bucket" {
   source = "./modules/bucket"
 
-  bucket = var.bucket
+  bucket         = var.bucket
   dynamodb_table = var.dynamodb_table
 }
 

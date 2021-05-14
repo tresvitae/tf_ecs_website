@@ -1,7 +1,7 @@
 resource "aws_s3_bucket" "tf_state" {
-  bucket = var.bucket
+  bucket    = var.bucket
+
   # Enable versioning so you can see the full revision history of state files
-  
   versioning {
     enabled = true
   }
