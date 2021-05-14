@@ -144,3 +144,21 @@ module "service" {
   target_group = module.alb.tg_arn # "${aws_alb_target_group.app.arn}"
   task_arn = aws_ecs_task_definition.softserve.arn
 }
+
+
+module "bucket" {
+  source = "./modules/bucket"
+
+  bucket = var.bucket
+  dynamodb_table = var.dynamodb_table
+}
+
+terraform {
+  backend "s3" {
+    bucket         = "tf-state-softserve"
+    key            = "terraform.tfstate"
+    region         = "eu-west-1"
+    dynamodb_table = "tf-locks"
+    encrypt        = true
+  }
+}
