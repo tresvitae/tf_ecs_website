@@ -1,4 +1,9 @@
-/*
+provider "aws" {
+  profile = "default"
+  region  = "eu-west-1"
+}
+
+
 resource "aws_s3_bucket" "tf_state" {
   bucket    = var.bucket
 
@@ -15,7 +20,6 @@ resource "aws_s3_bucket" "tf_state" {
     }
   }
 }
-*/
 
 resource "aws_dynamodb_table" "tf_locks" {
   name         = var.dynamodb_table

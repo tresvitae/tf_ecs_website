@@ -31,9 +31,3 @@ variable "iam_policy_arn" {
   description = "IAM Policy to be attached to role"
   type = list(string)
 }
-variable "bucket" {
-  type = string
-}
-variable "dynamodb_table" {
-  type = string
-}
