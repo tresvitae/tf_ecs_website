@@ -59,3 +59,7 @@ apt-get install -y unzip
 curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
 unzip awscliv2.zip
 ./aws/install
+
+# Install JSON Validator
+apt update
+apt install -y jsonlint
